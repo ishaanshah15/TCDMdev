@@ -65,6 +65,7 @@ from .objects import SphereLargeObject
 from .objects import SphereMediumObject
 from .objects import SphereDebugObject
 from .objects import SphereDebuggObject
+from .objects import SmallSphereDebugObject
 from .objects import SphereSmallObject
 from .objects import StampObject
 from .objects import StanfordBunnyObject

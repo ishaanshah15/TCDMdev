@@ -183,24 +183,28 @@ class ReferenceMotionTask(SingleObjectTask):
         super().__init__(object_name, reward_fns, reward_weights, random)
 
     def initialize_episode(self, physics):
-        #import ipdb
-        #ipdb.set_trace()
+        
         start_state = self.reference_motion.reset()[self._init_key]
         with physics.reset_context():
             physics.data.qpos[:] = start_state['position']
             physics.data.qvel[:] = start_state['velocity']
         out = super().initialize_episode(physics)
-        if not os.path.exists('initial_episode.png'):
+        
+        if not os.path.exists(f'initial_episode_{self._init_key}.png'):
             import time
             time.sleep(10)
-            plt.imsave('initial_episode.png',physics.render(camera_id=0, height=1080, width=1920))
+            plt.imsave(f'initial_episode_{self._init_key}.png',physics.render(camera_id=0, height=1080, width=1920))
             time.sleep(10)
             images = wandb.Image(
             physics.render(camera_id=0, height=1080, width=1920), 
             caption="Initial Grasp"
             )
-                
-            wandb.log({"initial_grasp": images})
+            
+            try:
+                wandb.log({"initial_grasp": images})
+                wandb.log({self._init_key: 0})
+            except:
+                pass
         return out
 
     def before_step(self, action, physics):

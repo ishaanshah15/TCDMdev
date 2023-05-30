@@ -100,6 +100,7 @@ SphereLargeObject = object_generator('objects/spherelarge.xml')
 SphereMediumObject = object_generator('objects/spheremedium.xml')
 SphereDebugObject = debug_generator('objects/spheredebug.xml')
 SphereDebuggObject = debug_generator('objects/spheredebugg.xml')
+SmallSphereDebugObject = debug_generator('objects/smallspheredebug.xml')
 SphereSmallObject = object_generator('objects/spheresmall.xml')
 StampObject = object_generator('objects/stamp.xml')
 StanfordBunnyObject = object_generator('objects/stanfordbunny.xml')
@@ -167,6 +168,7 @@ _OBJ_LOOKUP = {
                 'spheremedium': SphereMediumObject,
                 'spheredebug': SphereDebugObject,
                 'spheredebugg': SphereDebuggObject,
+                'smallspheredebug': SmallSphereDebugObject,
                 'spheresmall': SphereSmallObject,
                 'stamp': StampObject,
                 'stanfordbunny': StanfordBunnyObject,
