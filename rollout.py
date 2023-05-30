@@ -19,7 +19,7 @@ SEE: https://github.com/facebookresearch/DexMan#pre-trained-policies
 """
 
 parser = ArgumentParser(description="Example code for loading pre-trained policies")
-parser.add_argument('--save_folder', default='pretrained_agents/hammer_use1/', 
+parser.add_argument('--save_folder', default='pretrained_agents/cup_drink1/', 
                                      help="Save folder containing agent checkpoint/config")
 parser.add_argument('--render', action="store_true", help="Supply flag to render mp4")
 
@@ -38,14 +38,19 @@ def rollout(save_folder, writer):
     # build environment and load policy
     o, t = config['env']['name'].split('-')
     env = suite.load(o, t, config['env']['task_kwargs'], gym_wrap=True)
-    policy = PPO.load(os.path.join(save_folder, 'checkpoint.zip'))
+    #policy = PPO.load(os.path.join(save_folder, 'checkpoint.zip'))
+    policy = PPO.load('/home/ishaans/TCDM_dev/validate_grasp/model.zip')
 
     # rollout the policy and print total reward
     s, done, total_reward = env.reset(), False, 0
     render(writer, env.wrapped.physics)
     while not done:
+        
         action, _ = policy.predict(s['state'], deterministic=True)
         s, r, done, __ = env.step(action)
+        print('--------')
+        print(env.wrapped.physics.named.data.ctrl[:6])
+        print('--------')
         render(writer, env.wrapped.physics)
         total_reward += r
     print('Total reward:', total_reward)
@@ -55,6 +60,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # configure writer
+
     if args.render:
         writer = imageio.get_writer('rollout.mp4', fps=25)
         rollout(args.save_folder, writer)

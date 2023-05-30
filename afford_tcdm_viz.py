@@ -16,6 +16,8 @@ sys.path.append('.')
 sys.path.append('..')
 import numpy as np
 import torch
+from omegaconf import OmegaConf
+from scipy.spatial.transform import Rotation
 import os, time
 import argparse
 from tcdm import suite
@@ -37,6 +39,8 @@ class AffordTCDM():
         self.trial = trial
         self.threshold = 0.02
         self.dir = 'sim_images2'
+        self.pc_path = '/home/ishaans/grasp_outputs/grasp_tta_output_v10'
+        self.mocap_path = '/home/ishaans/afford_dex_pass/output/release/layout/cascade_hijack_masked/'
 
 
     def step1(self):
@@ -74,7 +78,6 @@ class AffordTCDM():
         plt.imsave(os.path.join(self.dir,task,'val_joint_indices.png'),physics.render(camera_id=0, height=1080, width=1920))
 
         
-
     def step2(self):
         task = self.task_name
         #add red spheres at the joint locations 
@@ -82,10 +85,11 @@ class AffordTCDM():
         env2 = mj_models.TableEnv()
         env2.attach(mj_models.Adroit(limp=True))
         object_model = self.object_model_cls(pos=np.array([0.0,0.0,0.1]))
-        #env2.attach(object_model)
+        env2.attach(object_model)
         
         for i in range(len(self.fing_pos)):
-            env2.attach(mj_models.SphereDebugObject(pos=self.fing_pos[i]))
+            pass
+            #env2.attach(mj_models.SphereDebugObject(pos=self.fing_pos[i]))
         physics = physics_from_mjcf(env2)
         physics.model.opt.gravity = np.array([0.0,0.0,0.0])
 
@@ -113,7 +117,9 @@ class AffordTCDM():
                 physics.named.data.mocap_pos['j{}_mocap'.format(i)] = p
             physics.step()
 
-            images.append(physics.render(camera_id=0, height=128, width=128))
+
+            if j%4 == 0:
+                images.append(physics.render(camera_id=0, height=128, width=128))
 
         
 
@@ -207,8 +213,24 @@ class AffordTCDM():
             diff.append(np.abs(qpos[i] - qpos[i+1]))
         
         diff = np.array(diff)
-        return diff        
+        return diff    
 
+
+    def step5(self):
+
+        domain,task = self.task_name.split('_')
+        
+        task_kwargs = {'pregrasp': 'afford_dex_pass'}
+
+        env = suite.load(domain, task, task_kwargs, {})  
+        env.reset()
+
+        # shift hand down by one meter
+        #env.physics.data.qpos[1] -= 1; 
+        #env.physics.forward()
+
+
+        plt.imsave(os.path.join(self.dir,self.task_name,'pregrasp_w_task.png'),env.physics.render(camera_id=0, height=1080, width=1920))
     
     def get_joints(self,joints):
 
@@ -252,18 +274,20 @@ class AffordTCDM():
         if not os.path.exists(os.path.join(self.dir,self.task_name)):
             os.makedirs(os.path.join(self.dir,self.task_name))
         
-        path = '/home/ishaans/afford_dex_pass/output/release/layout/cascade_hijack/recon/mocap'
+        path = os.path.join(self.mocap_path,'recon/mocap')
 
         joint_files = os.listdir(path)
         joints = np.load(os.path.join(path,self.task_name + f'_s{self.trial}_prediction_result.pkl'),allow_pickle=True)
-        joints = joints['pred_output_list'][0]['right_hand']
-        
-        if not ('pred_joints_smpl' in joints):
-            return
-        else:
-            joints = joints['pred_joints_smpl']
 
-        path2 =  '/home/ishaans/afford_dex_pass/output/release/layout/cascade_hijack/recon/rendered'
+        if not ('pred_joints_smpl' in joints['pred_output_list'][0]['right_hand']):
+            joints = joints['pred_output_list'][0]['left_hand']['pred_joints_smpl']
+            mean_x = np.mean(joints[:,0])
+            joints[:,0] = -joints[:,0] + 2*mean_x
+
+        else:
+            joints = joints['pred_output_list'][0]['right_hand']['pred_joints_smpl']
+
+        path2 =  os.path.join(self.mocap_path,'recon/rendered')
         src_im = os.path.join(path2,f'{self.task_name}_s{self.trial}.jpg')
         dest_im = os.path.join(self.dir,self.task_name,f'pred_grasp_{self.trial}.png')
         shutil.copyfile(src_im,dest_im)
@@ -273,21 +297,26 @@ class AffordTCDM():
     
         suffix = self.task_name
         self.object_type,task = suffix.split('_')
-        self.task = task.split('.')[0]
+        task_type = task.split('.')[0]
+
+        if self.object_type in ['dhand','dmanus']:
+            self.object_type = task_type
+        
         
         object_list = dir(mj_models)
         
-        try:
-            obj_name = [o for o in object_list if o.lower() == self.object_type + 'object'][0]
-        except:
-            obj_name = [o for o in object_list if o.lower() == self.object_type][0]
+        
+        obj_name = [o for o in object_list if o.lower() == self.object_type + 'object'][0]
+        
+       
         self.object_model_cls = getattr(mj_models,obj_name)
 
         com,start_pos = self.step1() 
         self.fing_pos += com
-        self.fing_pos += np.array([0.04,0.03,0.07])
+        #self.fing_pos += np.array([0.04,0.03,0.07])
         #self.validate_joint_indices(start_pos)
         #self.step2()
+        #self.point_cloud()
 
         self.step3(add_object=False)
         out = self.step4()
@@ -295,6 +324,7 @@ class AffordTCDM():
         #np.save(save_path,out)
         traj_file = os.path.join('trajectories/' + self.task_name + '.npz')
 
+        self.step5()
         
         diff_fing_pos = self.hand_radius(self.fing_pos)
 
@@ -322,11 +352,10 @@ class AffordTCDM():
 
 if __name__ == '__main__':
 
+    frames_path = '/home/ishaans/grasp_outputs/object_frames_back'
 
-    tasks = os.listdir('/home/ishaans/TCDM_dev/object_frames_back')
+    tasks = os.listdir(frames_path)
     tasks = [t.split('.')[0] for t in tasks]
-    
-    
     tasks.remove('dhand_cup')
     tasks.remove('dhand_waterbottle')
     tasks.remove('dmanus_coffeecan')
@@ -337,7 +366,9 @@ if __name__ == '__main__':
     tasks.remove('dmanus_crackerbox')
 
     
-    
+
+    tasks = ['alarmclock_lift']
+
     for task in tasks:
         print(task)
         for trial in range(0,3):
