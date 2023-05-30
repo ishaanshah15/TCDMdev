@@ -39,6 +39,7 @@ cfg_path = os.path.join(cfg_path, 'experiments')
 def train(cfg: DictConfig):
     try:
         cfg_yaml = OmegaConf.to_yaml(cfg)
+
         resume_model = cfg.resume_model
         if os.path.exists('exp_config.yaml'):
             old_config = yaml.load(open('exp_config.yaml', 'r'))
