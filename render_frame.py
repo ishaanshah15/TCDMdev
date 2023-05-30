@@ -3,7 +3,10 @@ from tcdm import suite
 import os 
 import numpy as np
 from scipy.spatial.transform import Rotation
+import shutil
+from moviepy.editor import VideoFileClip
 #TODO: Save out point clouds 
+
 
 
 def run():
@@ -94,11 +97,45 @@ def replace_fnames(cascade_path,frames_path):
 
 
 
+def change_output_names(path,folder_name):
+    import yaml
+    from datetime import datetime
+    now = datetime.now()
+    fname = os.path.join(path,folder_name,'exp_config.yaml')
+    with open(fname, "r") as stream:
+        yaml_file = yaml.safe_load(stream)
 
+    
+    pregrasp_key = yaml_file['params']['env']['task_kwargs']['pregrasp']
+    trial = pregrasp_key[-1]
+    pregrasp_key = pregrasp_key[:-2]
 
+    
+    task_name = yaml_file['params']['env']['name']
+    task_name = task_name.replace('-','_')
+    date_time = now.strftime("%m_%d_%Y_%H_%M_%S")
+    new_folder_name = f'{pregrasp_key}'
+    dest_folder = os.path.join('/home/ishaans/TCDM_dev/grasp_gen_scripts/finetune_vizes',new_folder_name,task_name,trial)
+    if not os.path.exists(dest_folder):
+        os.makedirs(dest_folder)
+    src_folder = os.path.join(path,folder_name,'eval_videos')
+    try:
+        videos = os.listdir(src_folder)
+    except:
+        return
+    videos = [int(v.split('-')[-1].split('.')[0]) for v in videos]
+    videos.sort()
+    video_str = f'eval-call-{videos[-1]}.mp4'
 
+    
+    save_str = f'eval_{videos[-1]}.mp4'
+    src_file = os.path.join(src_folder,video_str)
 
-
+    videoClip = VideoFileClip(src_file) 
+    videoClip.write_gif(os.path.join(dest_folder,f'eval_{videos[-1]}.gif'))
+    dest_file = os.path.join(dest_folder,save_str)
+    shutil.copyfile(src_file,dest_file)
+    
 
 def quat_to_euler():
     
@@ -123,5 +160,22 @@ if __name__ == '__main__':
     #quat_to_euler()
     #get_camera_pose()
     #run()
-    replace_cascade_names('/home/ishaans/afford_dex_pass/output/release/layout/cascade',
-                          '/home/ishaans/TCDM_dev/object_frames_back')
+    """
+    mocap_paths = ['/home/ishaans/afford_dex_pass/output/release/layout/cascade_size_06_ratio_1/',
+                '/home/ishaans/afford_dex_pass/output/release/layout/cascade_size_06_ratio_1732',
+                '/home/ishaans/afford_dex_pass/output/release/layout/cascade_size_06_ratio_05774/',
+                '/home/ishaans/afford_dex_pass/output/release/layout/cascade_size_075_ratio_1/',
+                '/home/ishaans/afford_dex_pass/output/release/layout/cascade_size_075_ratio_1732/',
+                '/home/ishaans/afford_dex_pass/output/release/layout/cascade_size_075_ratio_05774/']
+    """
+
+    path = '/home/ishaans/TCDM_dev/outputs/2023-05-28' 
+    fnames = os.listdir(path)
+    for folder_name in fnames:
+        change_output_names(path,folder_name)
+
+
+
+    
+    #for mpath in mocap_paths:
+    #replace_cascade_names(mpath,'/home/ishaans/grasp_outputs/object_frames_back')

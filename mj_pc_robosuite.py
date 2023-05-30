@@ -29,9 +29,18 @@ def generatePointCloud(sim,cam_id):
    
     pixl2world = np.linalg.inv(world2pixl)
 
-    pixl = [x for x in itertools.product(np.arange(img_height),np.arange(img_width))]
- 
-    pixl = np.array([x for x in pixl if segmentation[x[0],x[1], 0] == 72])
+    pixl_idx = [x for x in itertools.product(np.arange(img_height),np.arange(img_width))]
+
+
+    tokens = np.unique(segmentation)
+
+    
+    pixl = []
+    for t in tokens:
+        if t > 69 and t < 80 :
+            pixl += [x for x in pixl_idx if segmentation[x[0],x[1], 0] == t]
+            
+    pixl = np.array(pixl)
 
     if len(pixl) > 0:
         points = transform_from_pixels_to_world(pixl,depth,pixl2world)
@@ -70,12 +79,12 @@ def write_image(object_str,task_str):
     sim = e.physics
 
     point_list = []
-    for cam_id in range(5):
+    for cam_id in range(0,5):
         points,depth,segmentation = generatePointCloud(sim,cam_id)
         point_list.append(points)
         print('num points',len(points))
 
-        dir_name = 'object_point_clouds_v11/'
+        dir_name = 'object_point_clouds_v12/'
         path2 = dir_name + object_str + '_' + task_str + str(cam_id) + '.npy'
         path3 = dir_name + object_str + '_' + task_str  +  'segment' + str(cam_id) +'.npy'
         
