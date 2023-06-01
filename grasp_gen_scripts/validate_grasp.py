@@ -11,6 +11,7 @@
 # Contact: ps-license@tuebingen.mpg.de
 #
 import sys
+import copy
 import shutil
 sys.path.append('.')
 sys.path.append('..')
@@ -40,6 +41,7 @@ class ValidateGrasp():
         self.trial = trial
         self.dir = dir
         self.save_dir = os.path.join(self.parent_dir,self.dir,self.task_name,str(self.trial))
+        self.object_type,task = self.task_name.split('_')
 
     
     def grasp_object(self):
@@ -70,6 +72,10 @@ class ValidateGrasp():
         
         ctrl_lift = [ 0.25, -0.2, 0.12755218, -0.87627903, -0.39146814, 0.59359401]
 
+       
+        old_com = copy.deepcopy(env.physics.named.data.xipos[self.object_type + '/object'][None])[0]
+        new_com = copy.deepcopy(env.physics.named.data.xipos[self.object_type + '/object'][None])[0]
+
         for i in range(500):
             
             for j in range(len(ctrl_lift)):
@@ -78,15 +84,29 @@ class ValidateGrasp():
             env.physics.named.data.ctrl[6:] = 1
             env.physics.step()
 
+        
+            temp_com = copy.deepcopy(env.physics.named.data.xipos[self.object_type + '/object'][None])[0]
+            
+            if temp_com[2] > new_com[2]:
+                new_com = temp_com
+                
             if i%7 == 0:
                 images.append(env.physics.render(camera_id=0, height=128, width=128))
 
         tokens = str(env.physics.named.data.ctrl).split(' ')
         tokens = [t.replace('/','_') for t in tokens if 'adroit' in t]
         
+
+        if (new_com[2] - old_com[2]) > 0.1:
+            np.savetxt(os.path.join(self.save_dir,'passed_test2.txt'),new_com - old_com)
+        else:
+            np.savetxt(os.path.join(self.save_dir,'failed_test2.txt'),new_com - old_com)
+
         imageio.mimsave(os.path.join(self.save_dir,f'lift_object.gif'), images)
         clip = mp.VideoFileClip(os.path.join(self.save_dir,f'lift_object.gif'))
         clip.write_videofile(os.path.join(self.save_dir,f'lift_object.mp4'))
+
+        np.save(os.path.join(self.save_dir,'lift_frames.npy'),images)
         
         plt.imsave(os.path.join(self.save_dir,f'lift_object.png'),env.physics.render(camera_id=0, height=1080, width=1920))
 

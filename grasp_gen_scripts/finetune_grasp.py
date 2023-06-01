@@ -40,7 +40,7 @@ class AffordTCDM():
     def __init__(self,task_name,trial,mocap_path):
         self.task_name = task_name
         self.trial = trial
-        self.parent_dir = 'finetune_vizes'
+        self.parent_dir = 'finetune_all'
         self.pc_path = '/home/ishaans/TCDM_dev/object_point_clouds_v12/'
         self.mocap_path = mocap_path
         self.open_palm = 0.5
@@ -88,15 +88,18 @@ class AffordTCDM():
         if add_object:
             env3.attach(object_model)
         env3.attach(mj_models.Adroit(limp=True))
+        
         physics = physics_from_mjcf(env3)
 
         physics.data.qpos[:6] = traj_data['motion_planned']['position'][30:]
 
         physics.step()
 
-        old_qpos = copy.deepcopy(physics.data.qpos[:6])
+        
 
-        old_com = copy.deepcopy(physics.named.data.xipos[self.object_type + '/object'][None])
+        old_com = copy.deepcopy(physics.named.data.xipos[self.object_type + '/object'][None])[0]
+        new_com = copy.deepcopy(physics.named.data.xipos[self.object_type + '/object'][None])[0]
+        passed = True
 
         
         #self.fing_pos = self.compute_final_pos(start_pos,self.fing_pos)
@@ -104,13 +107,15 @@ class AffordTCDM():
         images = []
         size=1000
         linspaces = np.linspace(0, 1, num=size)
-        for dim in range(2):
+        for dim in range(3):
             start_pos = physics.body_poses.pos
             z_fingpos = np.mean(self.fing_pos,axis=0)[2]
             z_startpos = np.mean(start_pos,axis=0)[2]
-            end_pos = self.fing_pos - np.array([0,0,z_fingpos - z_startpos - 0.1])
-            if dim == 1:
-                end_pos = self.fing_pos
+            end_pos = self.fing_pos
+            if dim == 0:
+                end_pos = self.fing_pos - np.array([0,0,z_fingpos - z_startpos - 0.1])
+            if dim == 2:
+                start_pos = self.fing_pos
             for j in range(len(linspaces)):
                 l = linspaces[j]
                 target = l * end_pos + (1 - l) * start_pos
@@ -119,26 +124,33 @@ class AffordTCDM():
                 physics.step()
                 if j%40 == 0:
                     images.append(physics.render(camera_id=0, height=128, width=128))
-        
-        for idx in range(1000):
-            for i, p in enumerate(self.fing_pos):
-                physics.named.data.mocap_pos['j{}_mocap'.format(i)] = p
-            physics.step()
-            if idx%40 == 0:
-                images.append(physics.render(camera_id=0, height=128, width=128))
+                
+                temp_com = copy.deepcopy(physics.named.data.xipos[self.object_type + '/object'][None])[0]
+                diff = temp_com - old_com
+
+                if np.linalg.norm(diff) > np.linalg.norm(new_com - old_com):
+                    new_com = temp_com
+
+                if not ((np.linalg.norm(diff) < 0.07) and (np.abs(diff[2]) < 0.04)):
+                    passed = False
 
         if add_object:
             imageio.mimsave(os.path.join(self.save_dir,'grasp_obj.gif'), images)
             clip = mp.VideoFileClip(os.path.join(self.save_dir,f'grasp_obj.gif'))
             clip.write_videofile(os.path.join(self.save_dir,f'grasp_obj.mp4'))
 
-        new_com = physics.named.data.xipos[self.object_type + '/object'][None]
+        
 
-        diff = new_com - old_com
+        if passed:
+            np.savetxt(os.path.join(self.save_dir,'passed_test1.txt'),new_com - old_com)
+        else:
+            np.savetxt(os.path.join(self.save_dir,'failed_test1.txt'),new_com - old_com)
+
 
         im1 = physics.render(camera_id=0, height=1080, width=1920)
         obj_str = f'grasp_w_object.png' if add_object else  f'grasp.png'
         plt.imsave(os.path.join(self.save_dir,obj_str),im1)
+        np.save(os.path.join(self.save_dir,'ik_frames.npy'),images)
         out = physics.data.qpos[:]
 
         #physics.data.contact.dist
@@ -318,8 +330,8 @@ if __name__ == '__main__':
     tasks.remove('door_open')
     
 
-    #tasks = ['alarmclock_lift','elephant_pass1','duck_lift','knife_chop1']
-    tasks = ['alarmclock_lift','elephant_pass1','lightbulb_pass1','mouse_lift','watch_lift']
+    #tasks = ['alarmclock_lift','elephant_pass1']
+    #tasks = ['cup_pour1']
 
     mocap_paths = ['/home/ishaans/afford_dex_pass/output/release/layout/cascade_hijack_masked/',
                 '/home/ishaans/afford_dex_pass/output/release/layout/cascade_size_06_ratio_1/',
@@ -329,13 +341,19 @@ if __name__ == '__main__':
                 '/home/ishaans/afford_dex_pass/output/release/layout/cascade_size_075_ratio_1732/',
                 '/home/ishaans/afford_dex_pass/output/release/layout/cascade_size_075_ratio_05774/']
 
-    #mocap_paths = ['/home/ishaans/afford_dex_pass/output/release/layout/cascade_hijack_masked/',
-    #'/home/ishaans/afford_dex_pass/output/release/layout/cascade_size_06_ratio_1/']
+    """
+    mocap_paths = ['/home/ishaans/afford_dex_pass/output/release/layout/cascade_hijack_masked/',
+                   '/home/ishaans/afford_dex_pass/output/release/layout/cascade_size_06_ratio_1/']
 
+    """
     
+    
+
     for task in tasks:
         print(task)
-        for mpath in mocap_paths:
-            for trial in range(0,3):
+        for i in range(len(mocap_paths)):
+            mpath = mocap_paths[i]
+            size = 5 if i > 0 else 3
+            for trial in range(0,size):
                 tcdm = AffordTCDM(task,trial,mpath)
                 tcdm.run()
