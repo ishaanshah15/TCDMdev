@@ -1,13 +1,21 @@
 import os
 import numpy as np
 import pandas as pd
-from sklearn.utils import shuffle
+#from sklearn.utils import shuffle
+import time
+from argparse import ArgumentParser
+
+"""
+parser = ArgumentParser(description="Example code for loading pre-trained policies")
+parser.add_argument('--start',type=int)
+parser.add_argument('--end',type=int)
+"""
 
 def get_grasp_dict(path):
     sample_dict = {}
     grasp_test = {}
     afford_folders = os.listdir(path)
-    tasks = [x for x in os.listdir(os.path.join(path,afford_folders[0])) if os.path.isdir(os.path.join(path,afford_folders[0],x))] 
+    tasks = [x for x in os.listdir(os.path.join(path,afford_folders[-2])) if os.path.isdir(os.path.join(path,afford_folders[-2],x))] 
     for t in tasks:
         grasp_test[t] = {}
         for af in afford_folders:
@@ -43,7 +51,7 @@ def get_grasp_dict(path):
         
 
 def sample_grasps(task):
-    parent_path = 'finetune_all_tests'
+    parent_path = 'grasp_gen_scripts/finetune_all'
     grasp_dict,sample_dict = get_grasp_dict(parent_path)
     positive_paths,negative_paths = [],[]
     
@@ -74,6 +82,8 @@ def build_task(target_tasks):
         extra_pos_paths += pos_paths[3:8]
         extra_neg_paths += neg_paths[2:7]
 
+        print(t,len(pos_paths),len(neg_paths))
+
     positive_paths += min_pos_paths
     negative_paths += min_neg_paths
 
@@ -81,8 +91,8 @@ def build_task(target_tasks):
     np.random.shuffle(extra_neg_paths)
 
 
-    positive_paths += extra_pos_paths[:10]
-    negative_paths += extra_neg_paths[:8]
+    positive_paths += extra_pos_paths[:4]
+    negative_paths += extra_neg_paths[:4]
 
     all_paths = positive_paths + negative_paths
 
@@ -94,40 +104,59 @@ def build_task(target_tasks):
 
     train_grasps = [all_paths,all_keys,all_tasks,labels]
 
-    return train_grasps
+    print('#runs',len(train_grasps[0]))
+    print(positive_paths)
+
+    np.save('train_grasps',train_grasps)
 
 
 def path_to_key(path):
     splits = path.split('/')
-    pkey = f'{splits[1]}_{splits[-1]}'
+    pkey = f'{splits[-3]}_{splits[-1]}'
     return pkey
 
 
 def path_to_task(path):
-    task = path.split('/')[2]
+    task = path.split('/')[-2]
     task = task.replace('_','-') 
     return task
 
 
-def run_scripts(train_grasps,start=0,end=2):
+def run_scripts(start,end):
+    train_grasps = np.load('train_grasps_2_objs.npy')
     df = pd.DataFrame(train_grasps)
     df = df.transpose()
     df.columns = ['path','gkey','task','passed_tests']
-    project_name = 'corl_experiments'
+    project_name_pre = 'corl_experiments'
+    lines = []
+
     for i in range(start,end):
         row = df.iloc[[i]]
-        gkey = row['gkey']
-        task = row['task']
-        os.system(f"python train.py exp_name={gkey}  wandb.project={project_name} env.name={task} env.task_kwargs.pregrasp={gkey} &")
+        gkey = row['gkey'].item()
+        task = row['task'].item() 
+        
+        passed_test = 'passed' if int(row['passed_tests'].item()) ==1 else 'failed'
+        project_name = f'{project_name_pre}_{passed_test}'
+        
+        lines.append(f"python train.py exp_name={task}_{gkey}  wandb.project={project_name} env.name={task} env.task_kwargs.pregrasp={gkey} & \n")
+        lines.append("sleep 120 \n")
 
+    
+    if os.path.exists(f'run_{start}_{end}.sh'):
+        os.remove(f'run_{start}_{end}.sh')
+    with open (f'run_{start}_{end}.sh', 'w') as rsh:
+        rsh.writelines(lines)
 
 
 
 if __name__ == '__main__':
-    target_tasks = ['mug_drink3','toothbrush_lift','lightbulb_pass1','banana_pass1','stamp_stamp1']
-    #target_tasks = ['toothbrush_lift']
-    train_grasps = build_task(target_tasks)
-    run_scripts(train_grasps)
+    #args = parser.parse_args()
+    target_tasks = ['mug_drink3','flute_pass1','headphones_pass1','stapler_lift']
+    build_task(target_tasks)
+    #run_scripts(0,10)
+    #run_scripts(10,15)
+    #run_scripts(24,36)
+    
 
     
     
