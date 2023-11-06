@@ -4,7 +4,7 @@
 This codebase contains an implementation of the TCDM benchmark and PGDM learning framework from our paper, [Learning Dexterous Manipulation from Exemplar Object Trajectories and Pre-Grasps](https://pregrasps.github.io/). 
 
 
-```
+
 
 ## Requirements
 * Our code has been primarily tested on Ubuntu 20, but it should work on other versions of Linux
