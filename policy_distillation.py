@@ -21,10 +21,10 @@ import sys
 #sys.path.append('/home/ishaans/TCDM_dev/')
 from mj_pc_robosuite import get_pc
 from rollout_generalization import grasp_helper,rollout
-from dagger_simple.trainer import train_policy_2d
-from dagger_simple.action_dataset import preprocess_frames,preprocess_all
-from dagger_simple.policy_net import ResNetPolicy,ParamFC,CombinedNet
-from dagger_simple.trainer import STATE,RGB,COMBINED
+from dagger.trainer import train_policy_2d
+from dagger.action_dataset import preprocess_frames,preprocess_all
+from dagger.policy_net import ResNetPolicy,ParamFC,CombinedNet
+from dagger.trainer import STATE,RGB,COMBINED
 parser = ArgumentParser(description="Example code for loading pre-trained policies")
 
                                      
